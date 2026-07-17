@@ -44,9 +44,17 @@ video_transcript/
   outputs/           ← 落盘的 txt/srt
 ```
 
-## 前置依赖（重要）
+## 前置依赖（编排型模块）
 
-本模块运行前，需先启动两个下游服务（否则 `/run` 会报「未发现服务」）：
+本模块是**编排型**：自身不下载不识别，通过 HTTP 调用两个下游服务：
+`video_download`(:8789) 与 `audio_asr`(:8791)。这**不违反**「模块独立」——
+`MODULE_SPEC §1.1` 的独立指「不依赖宿主壳」，而非「模块间不可互调」。
+
+**自动拉起（v1.1+）**：`start_api.ps1` 启动前会探测两个下游，未在线则自动到
+同级 / `Desktop/mo_kuai` / `Desktop` 下找到 `video_download`、`audio_asr` 文件夹并拉起它们。
+因此**通常只需启动本模块一个**（双击 `start_web.bat` / `start_api.bat`）。
+
+自动拉起失败时（未找到文件夹 / 首启装依赖较久）会打印 warn，此时手动启动即可：
 
 1. `video_download`：双击其 `start.bat`
 2. `audio_asr`：双击其 `start_api.bat`（视频转写需要 ffmpeg 在 PATH）

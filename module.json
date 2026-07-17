@@ -1,8 +1,8 @@
 {
   "id": "transcript",
   "name": "视频文案归档",
-  "description": "输入视频链接 → 自动下载 → 提取音频转文字（必剪 BcutASR）→ 文案归档入库（SQLite），按视频标题命名，可自由改名。编排现有 download + asr 两个本机服务。",
-  "version": "1.0.0",
+  "description": "输入视频链接 → 自动下载 → 提取音频转文字（必剪 BcutASR）→ 文案归档入库（SQLite），按视频标题命名，可自由改名。编排现有 download + asr 两个本机服务（启动时自动拉起）。",
+  "version": "1.1.0",
   "category": "text",
 
   "input_schema": {
