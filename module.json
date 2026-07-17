@@ -86,6 +86,65 @@
     "timeout_seconds": 1800
   },
 
+  "capabilities": [
+    {
+      "id": "run-core",
+      "desc": "主 endpoint：链接→下载→转写→归档，返回 job_id",
+      "kind": "core",
+      "must_keep": true,
+      "endpoints": ["POST /run"],
+      "verify": { "manual": "先启动 download+asr 下游，POST /run {url} 应产生 job 并最终归档；宿主须透传 quality/cookiesFromBrowser/proxy" }
+    },
+    {
+      "id": "job-progress",
+      "desc": "任务进度（下载→转写→归档）与列表",
+      "kind": "aux",
+      "must_keep": true,
+      "endpoints": ["GET /jobs/{id}", "GET /jobs"],
+      "verify": { "method": "GET", "path": "/jobs", "expect": { "status": 200 } }
+    },
+    {
+      "id": "archive-crud",
+      "desc": "归档库：列表/搜索、详情、改名/改正文、删除（SQLite）",
+      "kind": "aux",
+      "must_keep": true,
+      "endpoints": ["GET /archives", "GET /archives/{id}", "PATCH /archives/{id}", "DELETE /archives/{id}"],
+      "verify": { "method": "GET", "path": "/archives", "expect": { "status": 200 } }
+    },
+    {
+      "id": "rename-sync-download",
+      "desc": "改名/删除会同步重命名/删除落盘 txt/srt；下载 /archives/{id}/download?fmt=txt|srt",
+      "kind": "aux",
+      "must_keep": true,
+      "endpoints": ["GET /archives/{id}/download"],
+      "verify": { "manual": "改名后 outputs/ 文件应同步重命名；DELETE 归档应连带删文件" }
+    },
+    {
+      "id": "cookie-passthrough",
+      "desc": "Cookie 管理透传到下载服务(:8789)：sites/login/save/close/list/file。宿主必须一并代理 /cookies/*",
+      "kind": "aux",
+      "must_keep": true,
+      "endpoints": ["GET /cookies/sites", "POST /cookies/login", "POST /cookies/save", "POST /cookies/close", "GET /cookies/list", "DELETE /cookies/file"],
+      "verify": { "manual": "启动 download 后 GET /cookies/sites 应经本服务透传返回站点列表；确认宿主已代理 /cookies/*（易漏）" }
+    },
+    {
+      "id": "downstream-health",
+      "desc": "下游发现与健康：/health.downstream 反映 download/asr 是否在线",
+      "kind": "aux",
+      "must_keep": true,
+      "endpoints": ["GET /health"],
+      "verify": { "method": "GET", "path": "/health", "expect": { "status": 200, "jsonHas": "downstream" } }
+    },
+    {
+      "id": "health-probe",
+      "desc": "健康检查：service===video_transcript",
+      "kind": "invariant",
+      "must_keep": true,
+      "endpoints": ["GET /health"],
+      "verify": { "method": "GET", "path": "/health", "expect": { "status": 200, "jsonEquals": { "service": "video_transcript" } } }
+    }
+  ],
+
   "local": {
     "label": "video_transcript",
     "defaultPort": 8799,

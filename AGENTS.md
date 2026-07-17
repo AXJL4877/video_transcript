@@ -74,6 +74,7 @@ start_web.bat   :: 起服务（若未运行）并打开 /ui
 | PATCH | `/archives/{id}` | 改名 `{title}` 或修订正文 `{text}` |
 | DELETE | `/archives/{id}` | 删除归档（连带删除落盘文件） |
 | GET | `/archives/{id}/download?fmt=txt\|srt` | 下载文案文件 |
+| GET/POST/DELETE | `/cookies/*` | Cookie 管理（`sites`/`login`/`save`/`close`/`list`/`file`），**代理**到下载服务(:8789) |
 | GET | `/ui` | 归档管理台 |
 | GET | `/docs` | OpenAPI |
 
@@ -97,6 +98,20 @@ POST /run {url}
 5. 进度跑到「完成 ✓」→ 下方列表出现新归档，标题为视频原标题
 6. 点「查看」可改名、修订正文、下载 TXT/SRT
 7. `GET /health` 中 `service === "video_transcript"`
+
+## Capabilities & 接入自检（防小功能漏接）
+
+所有能力（含 `cookie-passthrough` cookie 透传、`rename-sync-download` 改名同步落盘这类小功能）
+登记在 `module.json` → `capabilities[]`，为接入完成定义(DoD)。`must_keep: true` 的能力不得在接入中丢失。
+**最易漏的是 `/cookies/*` 透传**——宿主接入时必须一并代理。
+
+```bat
+start_api.bat        :: 先起服务（并启动 download/asr 下游）
+verify.bat           :: 逐条探测 capabilities（自动项变红=没接通）
+```
+
+或 `python verify.py`；过宿主代理自检：`python verify.py --base http://localhost:5173 --prefix /transcript-api`。
+`manual` 项脚本会列出，接入时逐条人工确认。规范见根 `MODULE_SPEC.md §10`。
 
 ## 注意
 
