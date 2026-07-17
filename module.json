@@ -1,0 +1,111 @@
+{
+  "id": "transcript",
+  "name": "视频文案归档",
+  "description": "输入视频链接 → 自动下载 → 提取音频转文字（必剪 BcutASR）→ 文案归档入库（SQLite），按视频标题命名，可自由改名。编排现有 download + asr 两个本机服务。",
+  "version": "1.0.0",
+  "category": "text",
+
+  "input_schema": {
+    "url": {
+      "type": "string",
+      "required": true,
+      "max_length": 2000,
+      "label": "视频链接",
+      "description": "支持 yt-dlp 覆盖的站点：B站 / YouTube / 抖音 等"
+    },
+    "title": {
+      "type": "string",
+      "required": false,
+      "max_length": 200,
+      "default": "",
+      "label": "自定义标题",
+      "description": "留空则用视频原标题；入库后仍可随时改名"
+    },
+    "quality": {
+      "type": "enum",
+      "options": ["audio", "best", "1080", "720", "480", "360"],
+      "default": "audio",
+      "required": false,
+      "label": "下载清晰度",
+      "description": "文案场景默认只下音频，最快最省；需要留存视频再选清晰度"
+    },
+    "cookiesFromBrowser": {
+      "type": "enum",
+      "options": ["", "edge", "chrome", "firefox"],
+      "default": "",
+      "required": false,
+      "label": "浏览器 Cookies",
+      "description": "需登录或有风控的站点（如 B站 412）选本机已登录浏览器"
+    },
+    "proxy": {
+      "type": "string",
+      "required": false,
+      "max_length": 200,
+      "label": "代理地址",
+      "description": "如 http://127.0.0.1:7890"
+    }
+  },
+
+  "output_schema": {
+    "job_id": {
+      "type": "string",
+      "label": "任务 ID"
+    },
+    "status_url": {
+      "type": "string",
+      "label": "进度查询路径"
+    },
+    "archive_id": {
+      "type": "number",
+      "label": "归档记录 ID"
+    },
+    "title": {
+      "type": "string",
+      "label": "归档标题"
+    },
+    "text": {
+      "type": "string",
+      "label": "文案（TXT）"
+    },
+    "files": {
+      "type": "file[]",
+      "label": "下载文件（txt/srt）"
+    }
+  },
+
+  "ui_hint": {
+    "form_layout": "vertical",
+    "icon": "archive",
+    "estimated_time_seconds": 120,
+    "service_panel": true
+  },
+
+  "runtime": {
+    "async": true,
+    "queue": "local-io",
+    "timeout_seconds": 1800
+  },
+
+  "local": {
+    "label": "video_transcript",
+    "defaultPort": 8799,
+    "maxTries": 15,
+    "envPort": "TRANSCRIPT_PORT",
+    "healthPath": "/health",
+    "endpoint": { "method": "POST", "path": "/run" },
+    "start": {
+      "windows": { "script": "start_api.ps1", "runtime": "powershell" }
+    },
+    "proxy": [
+      {
+        "prefix": "/transcript-api",
+        "rewrite": { "pattern": "^/transcript-api", "replacement": "" }
+      },
+      {
+        "prefix": "/transcript-health",
+        "pathEquals": true,
+        "rewrite": { "pattern": "^/transcript-health$", "replacement": "/health" }
+      }
+    ]
+  }
+}

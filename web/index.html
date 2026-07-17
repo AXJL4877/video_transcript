@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>视频文案归档</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --border:#2a2f3a;
+    --text:#e6e8ec; --muted:#9aa3b2; --accent:#4f8cff; --accent2:#3ad29f;
+    --danger:#ff5d5d; --radius:10px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 20px 60px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:20px}
+  .status-bar{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:18px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .dot.on{background:var(--accent2)} .dot.off{background:var(--danger)}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:18px}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:9px 11px;font-size:14px;outline:none}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+  .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:14px;cursor:pointer}
+  .btn:hover{filter:brightness(1.08)} .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .btn.sm{padding:5px 10px;font-size:12px}
+  .btn.danger{background:transparent;border:1px solid var(--danger);color:var(--danger)}
+  .actions{display:flex;gap:10px;align-items:center;margin-top:14px}
+  .prog{height:8px;background:var(--panel2);border-radius:6px;overflow:hidden;margin-top:12px;display:none}
+  .prog>span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
+  .stage{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+  .toolbar input{flex:1}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:top}
+  th{color:var(--muted);font-weight:500;font-size:12px}
+  .title-cell{font-weight:600}
+  .preview{color:var(--muted);font-size:12px;margin-top:3px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .meta{color:var(--muted);font-size:11px}
+  .empty{color:var(--muted);text-align:center;padding:30px 0}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}
+  .modal.open{display:flex}
+  .modal .box{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    width:100%;max-width:720px;max-height:86vh;overflow:auto;padding:20px}
+  .modal .box h3{margin:0 0 4px}
+  .modal textarea{min-height:320px;font-family:ui-monospace,Consolas,monospace;font-size:13px;white-space:pre-wrap}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#222833;border:1px solid var(--border);
+    padding:10px 18px;border-radius:8px;font-size:13px;display:none;z-index:30}
+  .toast.show{display:block}
+  .flex-between{display:flex;justify-content:space-between;align-items:center;gap:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>视频文案归档</h1>
+  <div class="sub">输入视频链接 → 自动下载 → 音频转文字 → 入库归档（按标题命名，可改名）</div>
+
+  <div class="status-bar" id="statusBar">
+    <span><span class="dot off" id="dotSelf"></span>本服务</span>
+    <span><span class="dot off" id="dotDl"></span>下载服务</span>
+    <span><span class="dot off" id="dotAsr"></span>转写服务</span>
+    <span id="statCount"></span>
+  </div>
+
+  <div class="card">
+    <label>视频链接</label>
+    <input id="url" placeholder="https://www.bilibili.com/video/...  或 YouTube / 抖音 链接" />
+    <div class="row">
+      <div>
+        <label>自定义标题（留空用视频原标题）</label>
+        <input id="title" placeholder="可留空" />
+      </div>
+      <div>
+        <label>下载清晰度</label>
+        <select id="quality">
+          <option value="audio">仅音频（最快，推荐）</option>
+          <option value="best">最佳</option>
+          <option value="1080">1080p</option>
+          <option value="720">720p</option>
+          <option value="480">480p</option>
+          <option value="360">360p</option>
+        </select>
+      </div>
+      <div>
+        <label>浏览器 Cookies（需登录站点）</label>
+        <select id="cookies">
+          <option value="">不使用</option>
+          <option value="edge">Edge</option>
+          <option value="chrome">Chrome</option>
+          <option value="firefox">Firefox</option>
+        </select>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="runBtn">开始下载并转写</button>
+      <span class="stage" id="stage"></span>
+    </div>
+    <div class="prog" id="prog"><span id="progBar"></span></div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <input id="search" placeholder="搜索标题 / 正文 / 链接…" />
+      <button class="btn ghost sm" id="refreshBtn">刷新</button>
+    </div>
+    <table>
+      <thead><tr><th style="width:52%">标题</th><th>字数</th><th>时间</th><th style="width:220px">操作</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" style="display:none">暂无归档，先在上面提交一个视频链接。</div>
+  </div>
+</div>
+
+<!-- 详情 / 编辑弹窗 -->
+<div class="modal" id="modal">
+  <div class="box">
+    <div class="flex-between">
+      <h3 id="mTitle">文案</h3>
+      <button class="btn ghost sm" onclick="closeModal()">关闭</button>
+    </div>
+    <div class="meta" id="mMeta"></div>
+    <label>标题（改名）</label>
+    <div style="display:flex;gap:8px">
+      <input id="mTitleInput" />
+      <button class="btn sm" onclick="saveTitle()">保存标题</button>
+    </div>
+    <label>正文（可修订）</label>
+    <textarea id="mText"></textarea>
+    <div class="actions">
+      <button class="btn" onclick="saveText()">保存正文</button>
+      <button class="btn ghost sm" onclick="copyText()">复制</button>
+      <a class="btn ghost sm" id="mDlTxt" target="_blank">下载 TXT</a>
+      <a class="btn ghost sm" id="mDlSrt" target="_blank">下载 SRT</a>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let pollTimer = null, curId = null;
+
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+function fmtTime(ts){ return new Date(ts*1000).toLocaleString('zh-CN',{hour12:false}); }
+
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  const data = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(data.detail || data.error || ('HTTP '+r.status));
+  return data;
+}
+
+async function loadHealth(){
+  try{
+    const h = await api('/health');
+    $('dotSelf').className = 'dot on';
+    $('dotDl').className = 'dot ' + (h.downstream?.download?.ok ? 'on':'off');
+    $('dotAsr').className = 'dot ' + (h.downstream?.asr?.ok ? 'on':'off');
+    $('statCount').textContent = `已归档 ${h.archives?.count||0} 条 / ${h.archives?.total_chars||0} 字`;
+  }catch(e){ $('dotSelf').className='dot off'; }
+}
+
+async function loadList(){
+  const q = $('search').value.trim();
+  const data = await api('/archives?q=' + encodeURIComponent(q));
+  const rows = $('rows'); rows.innerHTML = '';
+  if(!data.items.length){ $('empty').style.display='block'; return; }
+  $('empty').style.display='none';
+  for(const it of data.items){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <div class="title-cell">${escapeHtml(it.title)}</div>
+        <div class="preview">${escapeHtml(it.preview||'')}</div>
+        <div class="meta"><a href="${escapeHtml(it.source_url)}" target="_blank">源链接</a> · ${it.segments_count} 段 · ${it.engine||''}</div>
+      </td>
+      <td>${it.char_count}</td>
+      <td class="meta">${fmtTime(it.created_at)}</td>
+      <td>
+        <button class="btn sm" onclick="openDetail(${it.id})">查看</button>
+        <a class="btn ghost sm" href="/archives/${it.id}/download?fmt=txt" target="_blank">TXT</a>
+        <button class="btn danger sm" onclick="delItem(${it.id})">删除</button>
+      </td>`;
+    rows.appendChild(tr);
+  }
+}
+
+function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function run(){
+  const url = $('url').value.trim();
+  if(!url){ toast('请填写视频链接'); return; }
+  $('runBtn').disabled = true;
+  $('prog').style.display='block'; $('progBar').style.width='0%'; $('stage').textContent='提交任务…';
+  try{
+    const res = await api('/run', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        url, title: $('title').value.trim(),
+        quality: $('quality').value, cookiesFromBrowser: $('cookies').value
+      })
+    });
+    pollJob(res.job_id);
+  }catch(e){ toast('失败：'+e.message); $('runBtn').disabled=false; $('prog').style.display='none'; }
+}
+
+function pollJob(jobId){
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async ()=>{
+    try{
+      const j = await api('/jobs/'+jobId);
+      $('progBar').style.width = (j.progress||0)+'%';
+      $('stage').textContent = j.stage || j.status;
+      if(j.status==='done'){
+        clearInterval(pollTimer); $('runBtn').disabled=false;
+        $('stage').textContent = '完成 ✓ 已归档：'+ (j.title||'');
+        $('url').value=''; $('title').value='';
+        setTimeout(()=>{ $('prog').style.display='none'; },1500);
+        loadList(); loadHealth();
+        toast('已归档：'+(j.title||''));
+      }else if(j.status==='error'){
+        clearInterval(pollTimer); $('runBtn').disabled=false;
+        $('stage').textContent = '失败：'+ (j.error||'');
+        toast('失败：'+(j.error||''));
+      }
+    }catch(e){ clearInterval(pollTimer); $('runBtn').disabled=false; $('stage').textContent='查询失败：'+e.message; }
+  }, 1200);
+}
+
+async function openDetail(id){
+  curId = id;
+  const rec = await api('/archives/'+id);
+  $('mTitle').textContent = rec.title;
+  $('mMeta').innerHTML = `${rec.segments_count} 段 · ${rec.char_count} 字 · ${rec.engine||''} · <a href="${escapeHtml(rec.source_url)}" target="_blank">源链接</a>`;
+  $('mTitleInput').value = rec.title;
+  $('mText').value = rec.text || '';
+  $('mDlTxt').href = '/archives/'+id+'/download?fmt=txt';
+  $('mDlSrt').href = '/archives/'+id+'/download?fmt=srt';
+  $('modal').classList.add('open');
+}
+function closeModal(){ $('modal').classList.remove('open'); curId=null; }
+
+async function saveTitle(){
+  if(!curId) return;
+  try{
+    const rec = await api('/archives/'+curId, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:$('mTitleInput').value})});
+    $('mTitle').textContent = rec.title; toast('标题已更新'); loadList();
+  }catch(e){ toast('失败：'+e.message); }
+}
+async function saveText(){
+  if(!curId) return;
+  try{
+    await api('/archives/'+curId, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:$('mText').value})});
+    toast('正文已保存'); loadList();
+  }catch(e){ toast('失败：'+e.message); }
+}
+function copyText(){ navigator.clipboard.writeText($('mText').value).then(()=>toast('已复制')); }
+async function delItem(id){
+  if(!confirm('确认删除这条归档？')) return;
+  try{ await api('/archives/'+id, {method:'DELETE'}); toast('已删除'); loadList(); loadHealth(); }
+  catch(e){ toast('失败：'+e.message); }
+}
+
+$('runBtn').onclick = run;
+$('refreshBtn').onclick = loadList;
+$('search').addEventListener('input', ()=>{ clearTimeout(window._st); window._st=setTimeout(loadList,300); });
+$('modal').addEventListener('click', (e)=>{ if(e.target===$('modal')) closeModal(); });
+
+loadHealth(); loadList(); setInterval(loadHealth, 8000);
+</script>
+</body>
+</html>
