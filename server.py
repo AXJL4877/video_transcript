@@ -12,9 +12,10 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import requests
 from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import db
@@ -229,6 +230,63 @@ async def archive_download(record_id: int, fmt: str = "txt"):
     if not path.exists():
         raise HTTPException(404, detail="文件不存在")
     return FileResponse(path, filename=fname, media_type="text/plain; charset=utf-8")
+
+
+# ---------------- Cookie 管理（代理到下载服务，用于过 B站 412 等风控） ----------------
+# 实际的「打开浏览器登录 + 读取保存 Cookie」由 video_download(:8789) 实现，
+# 这里透传，让归档流程无需切到下载模块即可完成 Cookie 导入。
+
+def _download_base_or_503() -> str:
+    base = pipeline.discover("download")
+    if not base:
+        raise HTTPException(
+            503,
+            detail="未发现下载服务(:8789)，无法管理 Cookie。请先启动 video_download 模块。",
+        )
+    return base
+
+
+def _proxy(method: str, path: str, *, json_body=None, params=None, timeout: float = 60.0):
+    base = _download_base_or_503()
+    try:
+        r = requests.request(method, f"{base}{path}", json=json_body, params=params, timeout=timeout)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, detail=f"下载服务请求失败：{e}") from e
+    try:
+        payload = r.json()
+    except Exception:
+        payload = {"raw": r.text}
+    return JSONResponse(payload, status_code=r.status_code)
+
+
+@app.get("/cookies/sites")
+async def cookies_sites():
+    return _proxy("GET", "/cookies/sites", timeout=15)
+
+
+@app.post("/cookies/login")
+async def cookies_login(payload: dict[str, Any] = Body(default={})):
+    return _proxy("POST", "/cookies/login", json_body=payload, timeout=60)
+
+
+@app.post("/cookies/save")
+async def cookies_save(payload: dict[str, Any] = Body(default={})):
+    return _proxy("POST", "/cookies/save", json_body=payload, timeout=30)
+
+
+@app.post("/cookies/close")
+async def cookies_close(payload: dict[str, Any] = Body(default={})):
+    return _proxy("POST", "/cookies/close", json_body=payload, timeout=15)
+
+
+@app.get("/cookies/list")
+async def cookies_list():
+    return _proxy("GET", "/cookies/list", timeout=15)
+
+
+@app.delete("/cookies/file")
+async def cookies_file_delete(file: str = Query(...)):
+    return _proxy("DELETE", "/cookies/file", params={"file": file}, timeout=15)
 
 
 @app.get("/outputs/{filename}")

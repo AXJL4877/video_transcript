@@ -53,6 +53,17 @@
     padding:10px 18px;border-radius:8px;font-size:13px;display:none;z-index:30}
   .toast.show{display:block}
   .flex-between{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .cookie-box{margin-top:16px;border-top:1px solid var(--border);padding-top:12px}
+  .cookie-box summary{cursor:pointer;font-size:13px;color:var(--muted);user-select:none}
+  .cookie-box summary:hover{color:var(--text)}
+  .cookie-body{margin-top:12px}
+  .cookie-hint{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .cookie-sites{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .site-chip{border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;background:var(--panel2)}
+  .site-chip.active{border-color:var(--accent);color:var(--accent)}
+  .site-chip .badge{font-size:11px;margin-left:6px;color:var(--accent2)}
+  .cookie-files{margin-top:10px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+  .cookie-files .cf{display:flex;gap:10px;align-items:center}
 </style>
 </head>
 <body>
@@ -101,6 +112,25 @@
       <span class="stage" id="stage"></span>
     </div>
     <div class="prog" id="prog"><span id="progBar"></span></div>
+
+    <details class="cookie-box" id="cookieBox">
+      <summary>Cookie 管理（需登录 / 过 B站 412 风控时展开）</summary>
+      <div class="cookie-body">
+        <div class="cookie-hint">一键打开浏览器登录对应站点，回来点「保存 Cookie」即可；下载会自动带上。由下载服务(:8789)执行。</div>
+        <div class="cookie-sites" id="cookieSites"></div>
+        <div class="row" style="grid-template-columns:1fr auto auto auto;align-items:end">
+          <div>
+            <label>或自定义站点链接</label>
+            <input id="cookieUrl" placeholder="https://www.example.com" />
+          </div>
+          <button class="btn sm" id="ckLogin">打开浏览器登录</button>
+          <button class="btn sm" id="ckSave">保存 Cookie</button>
+          <button class="btn ghost sm" id="ckClose">关闭浏览器</button>
+        </div>
+        <div class="stage" id="ckStage"></div>
+        <div class="cookie-files" id="cookieFiles"></div>
+      </div>
+    </details>
   </div>
 
   <div class="card">
@@ -266,6 +296,70 @@ async function delItem(id){
   try{ await api('/archives/'+id, {method:'DELETE'}); toast('已删除'); loadList(); loadHealth(); }
   catch(e){ toast('失败：'+e.message); }
 }
+
+// ---------------- Cookie 管理 ----------------
+let ckSite = null;      // 选中的站点 key
+let ckSiteUrl = null;   // 选中站点的登录 URL
+
+function ckBody(){
+  const custom = $('cookieUrl').value.trim();
+  if(custom) return { url: custom };
+  if(ckSite) return { site: ckSite };
+  return null;
+}
+
+async function loadCookieSites(){
+  try{
+    const d = await api('/cookies/sites');
+    const box = $('cookieSites'); box.innerHTML='';
+    if(!d.browserAvailable){
+      box.innerHTML = '<span class="cookie-hint">未检测到 Edge / Chrome，无法一键登录；可手动放 cookies.txt 到下载模块。</span>';
+    }
+    for(const s of (d.sites||[])){
+      const chip = document.createElement('div');
+      chip.className = 'site-chip' + (ckSite===s.site?' active':'');
+      chip.innerHTML = escapeHtml(s.label) + (s.saved?'<span class="badge">已存</span>':'') + (s.running?'<span class="badge">●</span>':'');
+      chip.onclick = ()=>{ ckSite=s.site; ckSiteUrl=s.url; $('cookieUrl').value=''; loadCookieSites(); };
+      box.appendChild(chip);
+    }
+    loadCookieFiles(d.savedFiles);
+  }catch(e){ $('ckStage').textContent = '读取站点失败：'+e.message; }
+}
+
+function loadCookieFiles(files){
+  const box = $('cookieFiles'); box.innerHTML='';
+  for(const f of (files||[])){
+    const row = document.createElement('div'); row.className='cf';
+    row.innerHTML = `<span>${escapeHtml(f.file)}</span>`;
+    const del = document.createElement('button'); del.className='btn danger sm'; del.textContent='删除';
+    del.onclick = async ()=>{ try{ await api('/cookies/file?file='+encodeURIComponent(f.file),{method:'DELETE'}); ckStage('已删除 '+f.file); loadCookieSites(); }catch(e){ ckStage('删除失败：'+e.message); } };
+    row.appendChild(del); box.appendChild(row);
+  }
+}
+
+function ckStage(msg){ $('ckStage').textContent = msg; }
+
+$('ckLogin').onclick = async ()=>{
+  const body = ckBody();
+  if(!body){ ckStage('请先选择站点或填链接'); return; }
+  ckStage('正在打开浏览器…');
+  try{ const d = await api('/cookies/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); ckStage(d.message||'已打开浏览器，登录后点「保存 Cookie」'); }
+  catch(e){ ckStage('打开失败：'+e.message); }
+};
+$('ckSave').onclick = async ()=>{
+  const body = ckBody();
+  if(!body){ ckStage('请先选择站点或填链接'); return; }
+  ckStage('正在读取并保存 Cookie…');
+  try{ const d = await api('/cookies/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    ckStage(d.saved?`已保存 ${d.file}（${d.count} 条${d.hasLogin?'，含登录态':''}）`:'未读取到 Cookie'); loadCookieSites(); }
+  catch(e){ ckStage('保存失败：'+e.message); }
+};
+$('ckClose').onclick = async ()=>{
+  const body = ckBody(); if(!body){ ckStage('请先选择站点'); return; }
+  try{ await api('/cookies/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); ckStage('已关闭浏览器'); loadCookieSites(); }
+  catch(e){ ckStage('关闭失败：'+e.message); }
+};
+$('cookieBox').addEventListener('toggle', ()=>{ if($('cookieBox').open) loadCookieSites(); });
 
 $('runBtn').onclick = run;
 $('refreshBtn').onclick = loadList;
