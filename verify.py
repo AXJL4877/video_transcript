@@ -6,8 +6,8 @@
 
 用法：
   python verify.py                          # 直连本模块（ports.json / local.defaultPort）
-  python verify.py --base http://127.0.0.1:8795
-  python verify.py --base http://localhost:5173 --prefix /ai-in-api   # 走宿主代理，验证宿主接入
+  python verify.py --base http://127.0.0.1:8799
+  python verify.py --base http://localhost:5173 --prefix /transcript-api   # 走宿主代理，验证宿主接入
 
 退出码：全部通过=0；有 auto 探测失败=1。manual 项只提示、不影响退出码。
 """
