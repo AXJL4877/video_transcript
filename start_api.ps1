@@ -59,12 +59,21 @@ function Start-Downstream {
         Write-Host ">> [warn] no start script in '$FolderName'; please start $ServiceName manually."
         return
     }
-    Write-Host ">> auto-starting dependency: $ServiceName -> $script"
+    Write-Host ">> auto-starting dependency (silent): $ServiceName -> $script"
+    # CreateNoWindow: plain Start-Process opens a visible cmd/powershell window
+    # (this is what users see as "black console" when KE starts transcript).
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.WorkingDirectory = $dir
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
     if ($script.ToLower().EndsWith(".ps1")) {
-        Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$script`"" -WorkingDirectory $dir | Out-Null
+        $psi.FileName = "powershell.exe"
+        $psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$script`""
     } else {
-        Start-Process cmd -ArgumentList "/c `"$script`"" -WorkingDirectory $dir | Out-Null
+        $psi.FileName = "cmd.exe"
+        $psi.Arguments = "/c `"$script`""
     }
+    [void][System.Diagnostics.Process]::Start($psi)
     for ($i = 0; $i -lt 40; $i++) {
         Start-Sleep -Seconds 2
         $live = Find-LiveServiceInstance -ServiceId $ServiceId -ServiceName $ServiceName -DefaultPort $DefaultPort -MaxTries 15
