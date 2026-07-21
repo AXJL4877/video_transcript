@@ -60,12 +60,17 @@ function Start-Downstream {
         return
     }
     Write-Host ">> auto-starting dependency (silent): $ServiceName -> $script"
-    # CreateNoWindow: plain Start-Process opens a visible cmd/powershell window
+    # CreateNoWindow + KE_SILENT: plain Start-Process opens a visible cmd/powershell window
     # (this is what users see as "black console" when KE starts transcript).
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.WorkingDirectory = $dir
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
+    if ($psi.EnvironmentVariables.ContainsKey("KE_SILENT")) {
+        $psi.EnvironmentVariables["KE_SILENT"] = "1"
+    } else {
+        $psi.EnvironmentVariables.Add("KE_SILENT", "1")
+    }
     if ($script.ToLower().EndsWith(".ps1")) {
         $psi.FileName = "powershell.exe"
         $psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$script`""
